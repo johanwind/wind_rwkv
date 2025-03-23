@@ -47,7 +47,8 @@ if cmd_args.alg != 'fla':
         benchmark(attn_backstepping_smallhead, params)
     elif cmd_args.alg == 'longhead':
         print('Backstepping longhead fp32')
-        load_backstepping_longhead(cmd_args.headsz)
+        nheads = cmd_args.modeldim//cmd_args.headsz
+        load_backstepping_longhead(cmd_args.headsz, cmd_args.batchsz * nheads)
         benchmark(attn_backstepping_longhead, params)
     elif cmd_args.alg == 'chunked':
         print('Chunked cuda')

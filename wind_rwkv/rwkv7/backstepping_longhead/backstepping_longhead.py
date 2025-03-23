@@ -43,9 +43,12 @@ def attn_backstepping_longhead(r,w,k,v,a,b, s0 = None):
     if s0 is None: s0 = th.zeros(B,H,C,C, dtype=th.bfloat16,device=w.device)
     return RWKV7_longhead.apply(r,w,k,v,a,b, s0)
 
-def load_backstepping_longhead(head_size):
+def load_backstepping_longhead(head_size, batchsz_times_heads_estimate = 8*64):
     if hasattr(th.ops.wind_backstepping_longhead, 'forward'): return
-    CUDA_FLAGS = ['-res-usage', f'-D_C_={head_size}', f"-D_CHUNK_LEN_={CHUNK_LEN}", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization"]
+    value_chunk_size = 64
+    if th.cuda.get_device_properties(th.cuda.current_device()).multi_processor_count > batchsz_times_heads_estimate * head_size / value_chunk_size * 1.5:
+        value_chunk_size = 32
+    CUDA_FLAGS = ['-res-usage', f'-D_C_={head_size} -D_K_={value_chunk_size}', f"-D_CHUNK_LEN_={CHUNK_LEN}", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization"]
     path = os.path.dirname(__file__)
     load(name="wind_backstepping_longhead", sources=[os.path.join(path,'backstepping_longhead.cu'), os.path.join(path,'backstepping_longhead.cpp')], is_python_module=False, verbose=False, extra_cuda_cflags=CUDA_FLAGS)
     assert hasattr(th.ops.wind_backstepping_longhead, 'forward')

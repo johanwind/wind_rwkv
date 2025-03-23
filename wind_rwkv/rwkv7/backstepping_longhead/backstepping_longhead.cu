@@ -10,7 +10,7 @@ __device__ inline bf to_bf(const float & u) { return __float2bfloat16_rn(u); }
 
 typedef bf * __restrict__ F_;
 
-constexpr int K = 64; // Value dim chunksize
+constexpr int K = _K_; // Value dim chunksize
 
 // sum "val" in groups of _C_/K threads with stride K. Expects "share" to be shared memory of size _C_
 __device__ inline float sum_reduce(float val, float*share) {
