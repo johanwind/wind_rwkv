@@ -8,6 +8,11 @@ setup(
     author_email='johanswi@math.uio.no',
     url='https://github.com/johanwind/wind_rwkv',
     packages=find_packages(),
+    package_data={
+        "wind_rwkv.rwkv7.backstepping_longhead": ["*.cu", "*.cpp"],
+        "wind_rwkv.rwkv7.backstepping_smallhead": ["*.cu", "*.cpp"],
+        "wind_rwkv.rwkv7.chunked_cuda": ["*.cu", "*.cpp", "*.cuh"],
+    },
     license='MIT',
     classifiers=[
         'Programming Language :: Python :: 3',
