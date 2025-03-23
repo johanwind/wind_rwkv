@@ -90,8 +90,10 @@ __global__ void forward_kernel(int T, int H, F_ w_, F_ q_, F_ k_, F_ v_, F_ a_, 
 
         RTile kwt = transpose(kwi*fw), bwt = transpose(bwi*fw);
         for (int i = 0; i < WARPS; i++) {
-            int off = bi*H*(T/K)*C*C + hi*(T/K)*C*C + t*C*C + warpi*16*C + i*16;
-            GTile(s_+off, C) = (RTile)state[i];
+            if (s_ != NULL) {
+                int off = bi*H*(T/K)*C*C + hi*(T/K)*C*C + t*C*C + warpi*16*C + i*16;
+                GTile(s_+off, C) = (RTile)state[i];
+            }
 
             FTile fstate = state[i] * from_warp(fw, i, (float4*)share);
             fstate += vt % from_warp(kwt, i, (float4*)share);

@@ -122,7 +122,7 @@ def fw_attn_triton(w_,q_,k_,v_,a_,b_, s0_,y_,s_,sT_, wq_,wa_,kwi_,bwi_,fw_, B:tl
                 state = tl.load(s_+IND5(bi,hi,t0,i.trans(),j, H,T//dT,C,C)).to(tl.float32)
                 kwi = tl.load(kwi_+IND4(bi,hi,dt,j, H,dT,C)).to(tl.float32)
                 bwi = tl.load(bwi_+IND4(bi,hi,dt,j, H,dT,C)).to(tl.float32)
-                fw = tl.load(fw_+IND3(bi,hi,j, H,C))
+                fw = tl.load(fw_+IND3(bi,hi,j, H,C)).to(tl.float32)
 
                 state = state * fw + tl_dot(prec, sv.trans(), kwi*fw) + tl_dot(prec, u.trans(), bwi*fw)
 
@@ -223,7 +223,7 @@ def bw_attn_triton(w_,q_,k_,v_,a_,b_, dy_,s_,dsT_,ds_, dw_,dq_,dk_,dv_,da_,db_,d
                 wa = tl.load(wa_+IND4(bi,hi,dt,j, H,dT,C)).to(tl.float32)
                 bwi = tl.load(bwi_+IND4(bi,hi,dt,j, H,dT,C)).to(tl.float32)
                 kwi = tl.load(kwi_+IND4(bi,hi,dt,j, H,dT,C)).to(tl.float32)
-                fw = tl.load(fw_+IND3(bi,hi,j, H,C))
+                fw = tl.load(fw_+IND3(bi,hi,j, H,C)).to(tl.float32)
 
                 wa_state += tl_dot(prec, wa, state.trans())
                 bwi_dw_dstate += tl_dot(prec, bwi*fw, dstate.trans())
@@ -258,7 +258,7 @@ def bw_attn_triton(w_,q_,k_,v_,a_,b_, dy_,s_,dsT_,ds_, dw_,dq_,dk_,dv_,da_,db_,d
             fw_v_dstate = tl.zeros((dT,dC), tl.float32)
             state_dstate = tl.zeros((1,dC), tl.float32)
 
-            fw = tl.load(fw_+IND3(bi,hi,j, H,C))
+            fw = tl.load(fw_+IND3(bi,hi,j, H,C)).to(tl.float32)
             wa = tl.load(wa_+IND4(bi,hi,dt,j, H,dT,C)).to(tl.float32)
             wq = tl.load(wq_+IND4(bi,hi,dt,j, H,dT,C)).to(tl.float32)
             for i0 in range(0,C,dC):
@@ -322,15 +322,31 @@ def bw_attn_triton(w_,q_,k_,v_,a_,b_, dy_,s_,dsT_,ds_, dw_,dq_,dk_,dv_,da_,db_,d
                 tl.store(dw_+IND4(bi,k,hi,j, T,H,C), dw.to(tl.bfloat16))
 
 
+@triton.jit
+def tl_dot(prec:tl.constexpr, a, b):
+    if prec == 'fp32':
+        return tl.dot(a.to(tl.float32),b.trans().to(tl.float32).trans(), allow_tf32=False)
+    #elif prec == 'tf32': # This sometimes runs into a bug in the triton language
+        #return tl.dot(a.to(tl.float32),b.trans().to(tl.float32).trans(), allow_tf32=True)
+    elif prec == 'bf16':
+        return tl.dot(a.to(tl.bfloat16),b.trans().to(tl.bfloat16).trans(), allow_tf32=True)
+    else:
+        tl.static_assert(False)
 
-class TritonRWKV7(th.autograd.Function):
+
+class RWKV7_bighead(th.autograd.Function):
     @staticmethod
-    def forward(ctx, w,q,k,v,a,b,s0, dot_prec):
+    def forward(ctx, q,w,k,v,a,b,s0, dot_prec):
         K = 16
         B,T,H,C = w.shape
         assert T%K == 0
         assert C%16 == 0
-        s0 = th.zeros(B,H,C,C, dtype=w.dtype,device=w.device) if s0 is None else s0
+
+        assert all(i.dtype==th.bfloat16 for i in [w,q,k,v,a,b,s0])
+        assert all(i.is_contiguous() for i in [w,q,k,v,a,b,s0])
+        assert all(i.shape == w.shape for i in [w,q,k,v,a,b])
+        assert list(s0.shape) == [B,H,C,C]
+
         y = th.empty_like(v)
         sT = th.empty_like(s0)
         s = th.zeros(B,H,T//K,C,C, dtype=th.float32,device=w.device)
@@ -350,23 +366,21 @@ class TritonRWKV7(th.autograd.Function):
         ds = th.empty(B,H,C,C, dtype=th.float32,device=w.device)
         wq,wa,kwi,bwi,u,dab_u = [th.empty(B,H,K,C, dtype=th.float32,device=w.device) for i in range(6)]
         bw_attn_triton[(H,B)](w,q,k,v,a,b, dy,s,dsT,ds, dw,dq,dk,dv,da,db,ds0, wq,wa,kwi,bwi,fw,u,dab_u, B,T,H,C,K, ctx.dot_prec)
-        return dw,dq,dk,dv,da,db,ds0,None
+        return dq,dw,dk,dv,da,db,ds0,None
 
-@triton.jit
-def tl_dot(prec:tl.constexpr, a, b):
-    if prec == 'fp32':
-        return tl.dot(a.to(tl.float32),b.trans().to(tl.float32).trans(), allow_tf32=False)
-    elif prec == 'tf32':
-        return tl.dot(a.to(tl.float32),b.trans().to(tl.float32).trans(), allow_tf32=True)
-    elif prec == 'bf16':
-        return tl.dot(a.to(tl.bfloat16),b.trans().to(tl.bfloat16).trans(), allow_tf32=True)
-    else:
-        tl.static_assert(False)
+def attn_triton_bighead(r,w,k,v,a,b, s0 = None, dot_prec='fp32'):
+    B,T,H,C = w.shape
+    if s0 is None: s0 = th.zeros(B,H,C,C, dtype=th.bfloat16,device=w.device)
+    return RWKV7_bighead.apply(r,w,k,v,a,b,s0,dot_prec)
 
-def attn_triton_bighead(r,w,k,v,a,b, HEAD_SIZE, dot_prec = 'fp32'):
+def attn_triton_bighead_bf16(*args): return attn_triton_bighead(*args,dot_prec='bf16')
+#def attn_triton_bighead_tf32(*args): return attn_triton_bighead(*args,dot_prec='tf32')
+def attn_triton_bighead_fp32(*args): return attn_triton_bighead(*args,dot_prec='fp32')
+
+def attn_triton_bighead_wrap(r,w,k,v,a,b, s0 = None, return_state = False, head_size = 64, dot_prec = 'fp32'):
     B,T,HC = w.shape
-    C = HEAD_SIZE
+    C = head_size
     H = HC//C
     r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
     s0 = th.zeros(B,H,C,C, dtype=th.bfloat16,device=w.device)
-    return TritonRWKV7.apply(w,r,k,v,a,b,s0,dot_prec)[0].view(B,T,HC)
+    return RWKV7_bighead.apply(r,w,k,v,a,b,s0,dot_prec)[0].view(B,T,HC)

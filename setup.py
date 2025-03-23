@@ -2,11 +2,11 @@ from setuptools import find_packages, setup
 
 setup(
     name='wind_rwkv',
-    version='0.1',
+    version='0.2',
     description='Optimized kernels for RWKV models',
     author='Johan Sokrates Wind',
     author_email='johanswi@math.uio.no',
-    url='???',
+    url='https://github.com/johanwind/wind_rwkv',
     packages=find_packages(),
     license='MIT',
     classifiers=[
