@@ -45,10 +45,15 @@ def attn_backstepping_longhead(r,w,k,v,a,b, s0 = None):
 
 def load_backstepping_longhead(head_size, batchsz_times_heads_estimate = 8*64):
     if hasattr(th.ops.wind_backstepping_longhead, 'forward'): return
-    value_chunk_size = 64
-    if th.cuda.get_device_properties(th.cuda.current_device()).multi_processor_count >= batchsz_times_heads_estimate * head_size / 32:
-        value_chunk_size = 32
-    CUDA_FLAGS = ['-res-usage', f'-D_C_={head_size} -D_K_={value_chunk_size}', f"-D_CHUNK_LEN_={CHUNK_LEN}", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization"]
+    device_props = th.cuda.get_device_properties(th.cuda.current_device())
+    if 'AMD' in device_props.name:
+        value_chunk_size = 16
+        CUDA_FLAGS = [f'-D_C_={head_size}', f'-D_K_={value_chunk_size}', f'-D_CHUNK_LEN_={CHUNK_LEN}', '-O3', '-ffast-math', '-DAMD']
+    else:
+        value_chunk_size = 64
+        if th.cuda.get_device_properties(th.cuda.current_device()).multi_processor_count >= batchsz_times_heads_estimate * head_size / 32:
+            value_chunk_size = 32
+        CUDA_FLAGS = ['-res-usage', f'-D_C_={head_size} -D_K_={value_chunk_size}', f"-D_CHUNK_LEN_={CHUNK_LEN}", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization"]
     path = os.path.dirname(__file__)
     load(name="wind_backstepping_longhead", sources=[os.path.join(path,'backstepping_longhead.cu'), os.path.join(path,'backstepping_longhead.cpp')], is_python_module=False, verbose=False, extra_cuda_cflags=CUDA_FLAGS)
     assert hasattr(th.ops.wind_backstepping_longhead, 'forward')

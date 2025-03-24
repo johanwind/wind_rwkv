@@ -2,8 +2,13 @@
 #include <assert.h>
 
 using bf = __nv_bfloat16;
-__device__ inline float to_float(const bf & u) { return __bfloat162float(u); }
-__device__ inline bf to_bf(const float & u) { return __float2bfloat16_rn(u); }
+#if defined AMD
+#define to_float(x) (x)
+#define to_bf(x) (x)
+#else
+#define to_float(x) __bfloat162float(x)
+#define to_bf(x) __float2bfloat16_rn(x)
+#endif
 
 typedef bf * __restrict__ F_;
 
