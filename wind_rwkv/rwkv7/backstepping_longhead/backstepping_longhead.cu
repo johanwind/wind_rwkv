@@ -155,6 +155,7 @@ __global__ void backward_kernel(int T, int H, F_ w_, F_ q_, F_ k_, F_ v_, F_ a_,
             dv_[bb*T*H*C + t*H*C + hh*C + basei+rowi] = to_bf(dv);
             dSb_shared[rowi] = dSb;
         }
+        __syncthreads();
 
         float da = 0;
 #pragma unroll
