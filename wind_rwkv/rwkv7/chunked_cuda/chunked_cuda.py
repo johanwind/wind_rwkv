@@ -51,4 +51,4 @@ def attn_chunked_cuda_wrap(r,w,k,v,a,b, head_size):
     H = HC//C
     r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
     s0 = th.zeros(B,H,C,C, dtype=th.bfloat16,device=w.device)
-    return WindRWKV7.apply(w,r,k,v,a,b,s0)[0].view(B,T,HC)
+    return attn_chunked_cuda(r,w,k,v,a,b,s0)[0].view(B,T,HC)
