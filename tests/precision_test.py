@@ -58,6 +58,8 @@ if 0:
 
 print('Triton bighead bf16')
 grad_check(attn_triton_bighead_bf16, naive, params)
+print('Triton bighead fp16')
+grad_check(attn_triton_bighead_fp16, naive, params)
 print('Triton bighead fp32')
 grad_check(attn_triton_bighead_fp32, naive, params)
 

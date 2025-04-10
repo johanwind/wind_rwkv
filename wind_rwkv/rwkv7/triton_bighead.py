@@ -32,6 +32,7 @@ def fw_attn_triton(w_,q_,k_,v_,a_,b_, s0_,y_,s_,sT_, wq_,wa_,kwi_,bwi_,fw_, B:tl
     tl.static_assert(C%dC == 0)
     bi = tl.program_id(1)
     hi = tl.program_id(0)
+
     for i0 in range(0,C,dC):
         i = i0+tl.arange(0,dC)[None,:]
         for j0 in range(0,C,dC):
@@ -115,7 +116,7 @@ def fw_attn_triton(w_,q_,k_,v_,a_,b_, s0_,y_,s_,sT_, wq_,wa_,kwi_,bwi_,fw_, B:tl
             ab_u = tl_dot(prec, ak, sv) + wa_state
             u = tl_dot(prec, ab_inv, ab_u)
             yy = tl_dot(prec, qk, sv) + tl_dot(prec, qb, u) + wq_state
-            tl.store(y_+IND4(bi,t,hi,i, T,H,C), yy.to(tl.bfloat16))
+            tl.store(y_+IND4(bi,t,hi,i, T,H,C), yy)
 
             for j0 in range(0,C,dC):
                 j = j0+tl.arange(0,dC)[None,:]
@@ -129,7 +130,7 @@ def fw_attn_triton(w_,q_,k_,v_,a_,b_, s0_,y_,s_,sT_, wq_,wa_,kwi_,bwi_,fw_, B:tl
                 if t0+1 < T//dT:
                     tl.store(s_+IND5(bi,hi,t0+1,i.trans(),j, H,T//dT,C,C), state.to(tl.float32))
                 else:
-                    tl.store(sT_+IND4(bi,hi,i.trans(),j, H,C,C), state.to(tl.bfloat16))
+                    tl.store(sT_+IND4(bi,hi,i.trans(),j, H,C,C), state)
 
 
 @triton.autotune(configs=[triton.Config({'dC': dC}, num_stages=1) for dC in [16,32,64]], key=['T','H','C','dT','prec'])
@@ -138,7 +139,6 @@ def bw_attn_triton(w_,q_,k_,v_,a_,b_, dy_,s_,dsT_,ds_, dw_,dq_,dk_,dv_,da_,db_,d
     tl.static_assert(C%dC == 0)
     bi = tl.program_id(1)
     hi = tl.program_id(0)
-
     for i0 in range(0,C,dC):
         i = i0+tl.arange(0,dC)[None,:]
         for j0 in range(0,C,dC):
@@ -241,7 +241,7 @@ def bw_attn_triton(w_,q_,k_,v_,a_,b_, dy_,s_,dsT_,ds_, dw_,dq_,dk_,dv_,da_,db_,d
             tl.store(dab_u_+IND4(bi,hi,dt,i, H,dT,C), dab_u.to(tl.float32))
 
             dv = tl_dot(prec, qk.trans(), sdy) + kwi_dw_dstate + tl_dot(prec, ak.trans(), dab_u)
-            tl.store(dv_+IND4(bi,t,hi,i, T,H,C), dv.to(tl.bfloat16))
+            tl.store(dv_+IND4(bi,t,hi,i, T,H,C), dv)
 
             dab += tl_dot(prec, dab_u, u.trans()) * mask1
             dak += tl_dot(prec, dab_u, sv.trans()) * mask1
@@ -285,7 +285,7 @@ def bw_attn_triton(w_,q_,k_,v_,a_,b_, dy_,s_,dsT_,ds_, dw_,dq_,dk_,dv_,da_,db_,d
                 if t0 > 0:
                     tl.store(ds_+IND4(bi,hi,i.trans(),j, H,C,C), dstate.to(tl.float32))
                 else:
-                    tl.store(ds0_+IND4(bi,hi,i.trans(),j, H,C,C), dstate.to(tl.bfloat16))
+                    tl.store(ds0_+IND4(bi,hi,i.trans(),j, H,C,C), dstate)
 
             sw = tl.load(w_+IND4(bi,t,hi,j, T,H,C)).to(tl.float32)
             w = (-sw.exp()).exp()
@@ -297,16 +297,16 @@ def bw_attn_triton(w_,q_,k_,v_,a_,b_, dy_,s_,dsT_,ds_, dw_,dq_,dk_,dv_,da_,db_,d
             kwi = tl.load(kwi_+IND4(bi,hi,dt,j, H,dT,C)).to(tl.float32)
 
             da = non_incl_pref * (tl_dot(prec, dab, bwi) + tl_dot(prec, dak, kwi) + dab_u_state)
-            tl.store(da_+IND4(bi,t,hi,j, T,H,C), da.to(tl.bfloat16))
+            tl.store(da_+IND4(bi,t,hi,j, T,H,C), da)
 
             dq = incl_pref * (tl_dot(prec, dqb, bwi) + tl_dot(prec, dqk, kwi) + dy_state)
-            tl.store(dq_+IND4(bi,t,hi,j, T,H,C), dq.to(tl.bfloat16))
+            tl.store(dq_+IND4(bi,t,hi,j, T,H,C), dq)
 
             db = inv_incl_pref * (tl_dot(prec, dab.trans(), wa) + tl_dot(prec, dqb.trans(), wq) + fw_u_dstate)
-            tl.store(db_+IND4(bi,t,hi,j, T,H,C), db.to(tl.bfloat16))
+            tl.store(db_+IND4(bi,t,hi,j, T,H,C), db)
 
             dk = inv_incl_pref * (tl_dot(prec, dak.trans(), wa) + tl_dot(prec, dqk.trans(), wq) + fw_v_dstate)
-            tl.store(dk_+IND4(bi,t,hi,j, T,H,C), dk.to(tl.bfloat16))
+            tl.store(dk_+IND4(bi,t,hi,j, T,H,C), dk)
 
             dw0 = fw * state_dstate
             for k in range(t0*dT,t0*dT+dT):
@@ -319,7 +319,7 @@ def bw_attn_triton(w_,q_,k_,v_,a_,b_, dy_,s_,dsT_,ds_, dw_,dq_,dk_,dv_,da_,db_,d
 
                 wk = tl.load(w_+IND4(bi,k,hi,j, T,H,C)).to(tl.float32)
                 dw *= -wk.exp()
-                tl.store(dw_+IND4(bi,k,hi,j, T,H,C), dw.to(tl.bfloat16))
+                tl.store(dw_+IND4(bi,k,hi,j, T,H,C), dw)
 
 
 @triton.jit
@@ -330,6 +330,8 @@ def tl_dot(prec:tl.constexpr, a, b):
         #return tl.dot(a.to(tl.float32),b.trans().to(tl.float32).trans(), allow_tf32=True)
     elif prec == 'bf16':
         return tl.dot(a.to(tl.bfloat16),b.trans().to(tl.bfloat16).trans(), allow_tf32=True)
+    elif prec == 'fp16':
+        return tl.dot(a.to(tl.float16),b.trans().to(tl.float16).trans(), allow_tf32=True)
     else:
         tl.static_assert(False)
 
@@ -342,7 +344,7 @@ class RWKV7_bighead(th.autograd.Function):
         assert T%K == 0
         assert C%16 == 0
 
-        assert all(i.dtype==th.bfloat16 for i in [w,q,k,v,a,b,s0])
+        assert all(i.dtype==th.bfloat16 or (dot_prec == 'fp16' and i.dtype == th.float16) for i in [w,q,k,v,a,b,s0])
         assert all(i.is_contiguous() for i in [w,q,k,v,a,b,s0])
         assert all(i.shape == w.shape for i in [w,q,k,v,a,b])
         assert list(s0.shape) == [B,H,C,C]
@@ -370,10 +372,11 @@ class RWKV7_bighead(th.autograd.Function):
 
 def attn_triton_bighead(r,w,k,v,a,b, s0 = None, dot_prec='fp32'):
     B,T,H,C = w.shape
-    if s0 is None: s0 = th.zeros(B,H,C,C, dtype=th.bfloat16,device=w.device)
+    if s0 is None: s0 = th.zeros(B,H,C,C, dtype=r.dtype,device=w.device)
     return RWKV7_bighead.apply(r,w,k,v,a,b,s0,dot_prec)
 
 def attn_triton_bighead_bf16(*args): return attn_triton_bighead(*args,dot_prec='bf16')
+def attn_triton_bighead_fp16(*args): return attn_triton_bighead(*args,dot_prec='fp16')
 #def attn_triton_bighead_tf32(*args): return attn_triton_bighead(*args,dot_prec='tf32')
 def attn_triton_bighead_fp32(*args): return attn_triton_bighead(*args,dot_prec='fp32')
 
@@ -382,5 +385,5 @@ def attn_triton_bighead_wrap(r,w,k,v,a,b, s0 = None, return_state = False, head_
     C = head_size
     H = HC//C
     r,w,k,v,a,b = [i.view(B,T,H,C) for i in [r,w,k,v,a,b]]
-    s0 = th.zeros(B,H,C,C, dtype=th.bfloat16,device=w.device)
+    s0 = th.zeros(B,H,C,C, dtype=r.dtype,device=w.device)
     return RWKV7_bighead.apply(r,w,k,v,a,b,s0,dot_prec)[0].view(B,T,HC)

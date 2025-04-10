@@ -57,6 +57,9 @@ if cmd_args.alg != 'fla':
     elif cmd_args.alg == 'bighead_bf16':
         print('Triton bighead bf16')
         benchmark(attn_triton_bighead_bf16, params)
+    elif cmd_args.alg == 'bighead_fp16':
+        print('Triton bighead fp16')
+        benchmark(attn_triton_bighead_fp16, params)
     elif cmd_args.alg == 'bighead_fp32':
         print('Triton bighead fp32')
         benchmark(attn_triton_bighead_fp32, params)
