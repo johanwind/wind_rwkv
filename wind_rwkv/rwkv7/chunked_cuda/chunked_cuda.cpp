@@ -1,7 +1,8 @@
 // Copyright (c) 2024, Johan Sokrates Wind
 
 #include <torch/extension.h>
-#include <cuda_bf16.h>
+
+struct __nv_bfloat16;
 using bf = __nv_bfloat16;
 using torch::Tensor;
 
