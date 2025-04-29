@@ -4,7 +4,7 @@ from wind_rwkv.rwkv7 import *
 def naive(r,w,k,v,a,b,s0):
     if s0 is None: s0 = th.zeros(w.shape[0],w.shape[2],w.shape[3],w.shape[3], device=w.device)
     dtype = w.dtype
-    r,w,k,v,a,b,s = [i.float() for i in [r,w,k,v,a,b,s0]]
+    r,w,k,v,a,b,s = [i.double() for i in [r,w,k,v,a,b,s0]]
     y = th.empty_like(v)
     for t in range(w.shape[1]):
         s = s * th.exp(-th.exp(w[:,t,:,None,:])) + s @ a[:,t,:,:,None] * b[:,t,:,None,:] + v[:,t,:,:,None] * k[:,t,:,None,:]
@@ -66,6 +66,15 @@ grad_check(attn_triton_bighead_fp32, naive, params)
 print('Chunked cuda')
 load_chunked_cuda(headsz)
 grad_check(attn_chunked_cuda, naive, params)
+print('Chunked cuda varlen')
+load_chunked_cuda_varlen(headsz)
+def wrap_varlen(r,w,k,v,a,b,s0):
+    B,T,H,C = r.shape
+    r,w,k,v,a,b = [i.view(B*T,H,C) for i in [r,w,k,v,a,b]]
+    cu_seqlens = th.arange(B+1, device=w.device)*T
+    y,sT = attn_chunked_cuda_varlen(r,w,k,v,a,b,s0,cu_seqlens)
+    return y.view(B,T,H,C), sT
+grad_check(wrap_varlen, naive, params)
 
 print('Backstepping smallhead fp32')
 load_backstepping_smallhead(headsz)
@@ -75,3 +84,10 @@ print('Backstepping longhead fp32')
 load_backstepping_longhead(headsz)
 grad_check(attn_backstepping_longhead, naive, params)
 
+print('Singlestepping longhead fp32')
+load_singlestepping_longhead(headsz)
+grad_check(attn_singlestepping_longhead, naive, params)
+
+print('Replaystepping longhead fp32')
+load_replaystepping_longhead(headsz)
+grad_check(attn_replaystepping_longhead, naive, params)

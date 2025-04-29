@@ -54,6 +54,16 @@ if cmd_args.alg != 'fla':
         print('Chunked cuda')
         load_chunked_cuda(cmd_args.headsz)
         benchmark(attn_chunked_cuda, params)
+    elif cmd_args.alg == 'chunked_varlen':
+        print('Chunked cuda varlen')
+        load_chunked_cuda_varlen(cmd_args.headsz)
+        def wrap_varlen(r,w,k,v,a,b,s0):
+            B,T,H,C = r.shape
+            r,w,k,v,a,b = [i.view(B*T,H,C) for i in [r,w,k,v,a,b]]
+            cu_seqlens = th.arange(B+1, device=w.device)*T
+            y,sT = attn_chunked_cuda_varlen(r,w,k,v,a,b,s0,cu_seqlens)
+            return y.view(B,T,H,C), sT
+        benchmark(wrap_varlen, params)
     elif cmd_args.alg == 'bighead_bf16':
         print('Triton bighead bf16')
         benchmark(attn_triton_bighead_bf16, params)

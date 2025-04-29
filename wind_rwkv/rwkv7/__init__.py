@@ -1,4 +1,5 @@
 from .triton_bighead import attn_triton_bighead, attn_triton_bighead_bf16, attn_triton_bighead_fp16, attn_triton_bighead_fp32
 from .chunked_cuda.chunked_cuda import load_chunked_cuda, attn_chunked_cuda
+from .chunked_cuda_varlen.chunked_cuda_varlen import load_chunked_cuda_varlen, attn_chunked_cuda_varlen
 from .backstepping_smallhead.backstepping_smallhead import load_backstepping_smallhead, attn_backstepping_smallhead
 from .backstepping_longhead.backstepping_longhead import load_backstepping_longhead, attn_backstepping_longhead
