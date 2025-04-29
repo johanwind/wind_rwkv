@@ -9,7 +9,7 @@ class RWKV7_longhead(th.autograd.Function):
         B,T,H,C = w.shape
         assert T%CHUNK_LEN == 0
         if not th.compiler.is_compiling():
-            assert hasattr(th.ops.wind_backstepping_longhead, 'forward'), 'Requires a load kernel from load_backstepping_longhead(head_size)'
+            assert hasattr(th.ops.wind_backstepping_longhead, 'forward'), 'Requires a loaded kernel from load_backstepping_longhead(head_size)'
             assert all(i.dtype==th.bfloat16 for i in [w,q,k,v,a,b,s0])
             assert all(i.is_contiguous() for i in [w,q,k,v,a,b,s0])
             assert all(i.shape == w.shape for i in [w,q,k,v,a,b])

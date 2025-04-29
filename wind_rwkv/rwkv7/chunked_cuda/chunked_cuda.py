@@ -7,7 +7,7 @@ class RWKV7_chunked(th.autograd.Function):
         B,T,H,C = w.shape
         assert T%16 == 0
         if not th.compiler.is_compiling():
-            assert hasattr(th.ops.wind_chunked_cuda, 'forward'), 'Requires a load kernel from load_chunked_cuda(head_size)'
+            assert hasattr(th.ops.wind_chunked_cuda, 'forward'), 'Requires a loaded kernel from load_chunked_cuda(head_size)'
             assert all(i.dtype==th.bfloat16 for i in [w,q,k,v,a,b,s0])
             assert all(i.is_contiguous() for i in [w,q,k,v,a,b,s0])
             assert all(i.shape == w.shape for i in [w,q,k,v,a,b])
