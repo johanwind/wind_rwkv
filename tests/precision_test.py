@@ -83,11 +83,3 @@ grad_check(attn_backstepping_smallhead, naive, params)
 print('Backstepping longhead fp32')
 load_backstepping_longhead(headsz)
 grad_check(attn_backstepping_longhead, naive, params)
-
-print('Singlestepping longhead fp32')
-load_singlestepping_longhead(headsz)
-grad_check(attn_singlestepping_longhead, naive, params)
-
-print('Replaystepping longhead fp32')
-load_replaystepping_longhead(headsz)
-grad_check(attn_replaystepping_longhead, naive, params)

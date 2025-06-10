@@ -80,7 +80,7 @@ __global__ void forward_kernel(int T, int H, F_ w_, F_ q_, F_ k_, F_ v_, F_ a_, 
         if ((t+1)%_CHUNK_LEN_ == 0 && s_ != NULL) {
             int base = (bb*H+hh)*(T/_CHUNK_LEN_)*C*C + (t/_CHUNK_LEN_)*C*C + basej*C + rowi_;
 #pragma unroll
-            for (int j = 0; j < C; j++) {
+            for (int j = 0; j < K; j++) {
                 s_[base + j*C] = state[j];
             }
         }
