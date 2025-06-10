@@ -3,14 +3,19 @@
 # Based on https://github.com/BlinkDL/RWKV-LM/tree/main/RWKV-v7/train_temp
 
 """
-# Install requirements (see https://pytorch.org/get-started/locally/ to install torch for cuda != 12.6)
-pip install -U torch deepspeed ninja wandb
+# Install wind_rwkv (from root wind_rwkv directory)
+pip install -e .
+
+# Install requirements
+pip install deepspeed ninja wandb
 
 # Download data, we use minipile (1498226207 tokens, around 3GB)
 mkdir -p data
 wget --continue -O data/minipile.idx https://huggingface.co/datasets/BlinkDL/minipile-tokenized/resolve/main/rwkv_vocab_v20230424/minipile.idx
 wget --continue -O data/minipile.bin https://huggingface.co/datasets/BlinkDL/minipile-tokenized/resolve/main/rwkv_vocab_v20230424/minipile.bin
 
+# Run on a single gpu with ~8GB RAM
+torchrun train.py --micro_bsz 12
 # Run on 4 gpus without gradient checkpointing
 torchrun --nproc-per-node=4 train.py --grad_cp 0
 
