@@ -304,6 +304,7 @@ class L2Wrap(torch.autograd.Function):
 
 
 if __name__ == "__main__":
+    assert "LOCAL_RANK" in os.environ, 'train.py should be ran with torchrun, see usage instructions at the top of the code'
     torch.cuda.set_device(int(os.environ["LOCAL_RANK"]))
 
     args = parse_args()
@@ -321,14 +322,15 @@ if __name__ == "__main__":
             init_weights = sample_initial_weights(model, args)
             torch.save(init_weights, filename)
 
+    deepspeed.init_distributed()
+    deepspeed.comm.barrier() # Wait for initial model to be ready
+
     # Find latest model and load it
     latest = max([int(p[5:-4]) for p in os.listdir(args.proj_dir) if p.startswith("rwkv-") and p.endswith(".pth") and p[5:-4].isdigit()], default=-1)
     start_epoch = latest+1
     if latest == -1: latest = 'init'
     filename = f"{args.proj_dir}/rwkv-{latest}.pth"
 
-    deepspeed.init_distributed()
-    deepspeed.comm.barrier() # Wait for initial model to be ready
     if args.global_rank == 0:
         print(f'Loading {filename}')
     model.load_state_dict(torch.load(filename))
