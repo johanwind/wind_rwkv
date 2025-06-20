@@ -12,13 +12,13 @@ using bf = __nv_bfloat16;
 
 typedef bf * __restrict__ F_;
 
-__global__ void forward_kernel(int T, int H, F_ w_, F_ q_, F_ k_, F_ v_, F_ a_, F_ b_, F_ s0_, bf* y_, float* s_, float* sa_, bf* sT_) {
+__global__ void forward_kernel(int T, int H, F_ w_, F_ q_, F_ k_, F_ v_, F_ a_, F_ b_, float* __restrict__ s0_, bf* y_, float* s_, float* sa_, float* sT_) {
     constexpr int C = _C_;
     int bb = blockIdx.y, hh = blockIdx.x, i = threadIdx.x;
 
     float state[C];
     for (int j = 0; j < C; j++) {
-        state[j] = to_float(s0_[bb*H*C*C + hh*C*C + i * C + j]);
+        state[j] = s0_[bb*H*C*C + hh*C*C + i * C + j];
     }
     __shared__ float q[C], k[C], w[C], a[C], b[C];
 
@@ -58,18 +58,18 @@ __global__ void forward_kernel(int T, int H, F_ w_, F_ q_, F_ k_, F_ v_, F_ a_, 
         }
     }
     for (int j = 0; j < C; j++) {
-        sT_[bb*H*C*C + hh*C*C + i * C + j] = to_bf(state[j]);
+        sT_[bb*H*C*C + hh*C*C + i * C + j] = state[j];
     }
 }
 
-__global__ void backward_kernel(int T, int H, F_ w_, F_ q_, F_ k_, F_ v_, F_ a_, F_ b_, F_ dy_, float * __restrict__ s_, float * __restrict__ sa_, F_ dsT_, bf* dw_, bf* dq_, bf* dk_, bf* dv_, bf* da_, bf* db_, bf* ds0_) {
+__global__ void backward_kernel(int T, int H, F_ w_, F_ q_, F_ k_, F_ v_, F_ a_, F_ b_, F_ dy_, float* __restrict__ s_, float* __restrict__ sa_, float* __restrict__ dsT_, bf* dw_, bf* dq_, bf* dk_, bf* dv_, bf* da_, bf* db_, float* ds0_) {
     constexpr int C = _C_;
     int bb = blockIdx.y, hh = blockIdx.x, i = threadIdx.x;
 
     float stateT[C] = {0}, dstate[C] = {0}, dstateT[C] = {0};
     for (int j = 0; j < C; j++) {
-        dstate[j] = to_float(dsT_[bb*H*C*C + hh*C*C + i * C + j]);
-        dstateT[j] = to_float(dsT_[bb*H*C*C + hh*C*C + j * C + i]);
+        dstate[j] = dsT_[bb*H*C*C + hh*C*C + i * C + j];
+        dstateT[j] = dsT_[bb*H*C*C + hh*C*C + j * C + i];
     }
     __shared__ float w[C], q[C], k[C], v[C], a[C], b[C], dy[C], sa[C], dSb_shared[C];
     float qi, wi, ki, ai, bi, dyi;
@@ -143,14 +143,14 @@ __global__ void backward_kernel(int T, int H, F_ w_, F_ q_, F_ k_, F_ v_, F_ a_,
         }
     }
     for (int j = 0; j < C; j++) {
-        ds0_[bb*H*C*C + hh*C*C + i * C + j] = to_bf(dstate[j]);
+        ds0_[bb*H*C*C + hh*C*C + i * C + j] = dstate[j];
     }
 }
 
-void cuda_forward(int B, int T, int H, bf*w, bf*q, bf*k, bf*v, bf*a, bf*b, bf*s0, bf*y, float*s, float*sa, bf*sT) {
+void cuda_forward(int B, int T, int H, bf*w, bf*q, bf*k, bf*v, bf*a, bf*b, float*s0, bf*y, float*s, float*sa, float*sT) {
     forward_kernel<<<dim3(H,B), dim3(_C_)>>>(T,H,w,q,k,v,a,b,s0,y,s,sa,sT);
 }
-void cuda_backward(int B, int T, int H, bf*w, bf*q, bf*k, bf*v, bf*a, bf*b, bf*dy, float*s, float*sa, bf*dsT, bf*dw, bf*dq, bf*dk, bf*dv, bf*da, bf*db, bf*ds0) {
+void cuda_backward(int B, int T, int H, bf*w, bf*q, bf*k, bf*v, bf*a, bf*b, bf*dy, float*s, float*sa, float*dsT, bf*dw, bf*dq, bf*dk, bf*dv, bf*da, bf*db, float*ds0) {
     assert(T%_CHUNK_LEN_ == 0);
     backward_kernel<<<dim3(H,B), dim3(_C_)>>>(T,H,w,q,k,v,a,b,dy,s,sa,dsT,dw,dq,dk,dv,da,db,ds0);
 }

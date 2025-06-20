@@ -3,13 +3,13 @@ from wind_rwkv.rwkv7 import *
 
 def naive(r,w,k,v,a,b,s0):
     if s0 is None: s0 = th.zeros(w.shape[0],w.shape[2],w.shape[3],w.shape[3], device=w.device)
-    dtype = w.dtype
+    w_dtype = w.dtype
     r,w,k,v,a,b,s = [i.double() for i in [r,w,k,v,a,b,s0]]
     y = th.empty_like(v)
     for t in range(w.shape[1]):
         s = s * th.exp(-th.exp(w[:,t,:,None,:])) + s @ a[:,t,:,:,None] * b[:,t,:,None,:] + v[:,t,:,:,None] * k[:,t,:,None,:]
         y[:,t,:,:,None] = s @ r[:,t,:,:,None]
-    return y.to(dtype), s.to(dtype)
+    return y.to(w_dtype), s.to(s0.dtype)
 
 def grad_check(f1, f2, params, backward = True, aux=()):
     if backward: params = [p.clone().requires_grad_() for p in params]

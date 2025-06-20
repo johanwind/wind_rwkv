@@ -10,10 +10,11 @@ class RWKV7_smallhead(th.autograd.Function):
         assert T%CHUNK_LEN == 0
         if not th.compiler.is_compiling():
             assert hasattr(th.ops.wind_backstepping_smallhead, 'forward'), 'Requires a loaded kernel from load_backstepping_smallhead(head_size)'
-            assert all(i.dtype==th.bfloat16 for i in [w,q,k,v,a,b,s0])
+            assert all(i.dtype==th.bfloat16 for i in [w,q,k,v,a,b])
             assert all(i.is_contiguous() for i in [w,q,k,v,a,b,s0])
             assert all(i.shape == w.shape for i in [w,q,k,v,a,b])
             assert list(s0.shape) == [B,H,C,C]
+        s0 = s0.float()
         B,T,H,C = w.shape
         y = th.empty_like(v)
         sT = th.empty_like(s0)
@@ -27,8 +28,9 @@ class RWKV7_smallhead(th.autograd.Function):
         w,q,k,v,a,b,s,sa = ctx.saved_tensors
         B,T,H,C = w.shape
         if not th.compiler.is_compiling():
-            assert all(i.dtype==th.bfloat16 for i in [dy,dsT])
+            assert dy.dtype == th.bfloat16
             assert all(i.is_contiguous() for i in [dy,dsT])
+        dsT = dsT.float()
 
         dw,dq,dk,dv,da,db,ds0 = [th.empty_like(x) for x in [w,q,k,v,a,b,dsT]]
         th.ops.wind_backstepping_smallhead.backward(w,q,k,v,a,b, dy,s,sa,dsT, dw,dq,dk,dv,da,db,ds0)
