@@ -1,0 +1,1 @@
+from .smallhead_moh.smallhead_moh import load_smallhead_moh, attn_smallhead_moh
