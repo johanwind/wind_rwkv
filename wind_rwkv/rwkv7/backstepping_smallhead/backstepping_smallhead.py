@@ -44,7 +44,7 @@ def attn_backstepping_smallhead(r,w,k,v,a,b, s0 = None):
 def load_backstepping_smallhead(head_size):
     if hasattr(th.ops.wind_backstepping_smallhead, 'forward'): return
     device_props = th.cuda.get_device_properties(th.cuda.current_device())
-    if 'AMD' in device_props.name:
+    if hasattr(th.version, "hip") and th.version.hip is not None:
         CUDA_FLAGS = [f'-D_C_={head_size}', f'-D_CHUNK_LEN_={CHUNK_LEN}', '-O3', '-ffast-math', '-DAMD']
     else:
         CUDA_FLAGS = ['-res-usage', f'-D_C_={head_size}', f"-D_CHUNK_LEN_={CHUNK_LEN}", "--use_fast_math", "-O3", "-Xptxas -O3", "--extra-device-vectorization"]

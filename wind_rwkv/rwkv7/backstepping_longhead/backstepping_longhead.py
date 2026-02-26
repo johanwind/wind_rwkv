@@ -46,7 +46,7 @@ def attn_backstepping_longhead(r,w,k,v,a,b, s0 = None):
 def load_backstepping_longhead(head_size, batchsz_times_heads_estimate = 8*64):
     if hasattr(th.ops.wind_backstepping_longhead, 'forward'): return
     device_props = th.cuda.get_device_properties(th.cuda.current_device())
-    if 'AMD' in device_props.name:
+    if hasattr(th.version, "hip") and th.version.hip is not None:
         value_chunk_size = 16
         CUDA_FLAGS = [f'-D_C_={head_size}', f'-D_K_={value_chunk_size}', f'-D_CHUNK_LEN_={CHUNK_LEN}', '-O3', '-ffast-math', '-DAMD']
     else:
